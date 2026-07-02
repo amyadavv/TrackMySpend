@@ -2,11 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import { getExpenses, addExpense, deleteExpense } from './db.js';
 
-// PORT and HOST are injected by the platform (Render, Railway, etc.) or loaded from .env locally.
-// HOST defaults to 0.0.0.0 so the server binds on all interfaces — required by cloud platforms.
+// PORT is injected by the platform (Render sets it automatically) or falls back to 5000 locally.
+// No HOST is passed to app.listen so Node defaults to 0.0.0.0 (all interfaces) — required by cloud platforms.
 const app = express();
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || '0.0.0.0';
 
 
 // Enable CORS for frontend integration
@@ -227,7 +226,7 @@ app.delete('/expenses/:id', async (req, res) => {
   }
 });
 
-// Start Server
-app.listen(PORT, HOST, () => {
-  console.log(`Expense Tracker Backend is running at http://${HOST}:${PORT}`);
+// Start Server — no host argument so Node binds to 0.0.0.0 (all interfaces) by default.
+app.listen(PORT, () => {
+  console.log(`Expense Tracker Backend is running on port ${PORT}`);
 });
