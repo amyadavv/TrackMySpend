@@ -1,5 +1,27 @@
 import { BASE_URL } from '../constants';
 
+const TOKEN_KEY = 'tms_auth_token';
+
+/**
+ * Returns an Authorization header object with the stored JWT token.
+ * @returns {Record<string, string>}
+ */
+function authHeaders() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Handle 401 responses by clearing the token and reloading to show login.
+ * @param {Response} response
+ */
+function handleUnauthorized(response) {
+  if (response.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.reload();
+  }
+}
+
 /**
  * Builds simulation headers based on the current network mode.
  * @param {'normal'|'slow'|'unreliable'} networkMode
@@ -26,11 +48,12 @@ export async function getExpenses({ categoryFilter = '', networkMode = 'normal' 
     url += `&category=${encodeURIComponent(categoryFilter)}`;
   }
 
-  const headers = buildSimHeaders(networkMode);
+  const headers = { ...authHeaders(), ...buildSimHeaders(networkMode) };
 
   const response = await fetch(url, { headers });
 
   if (!response.ok) {
+    handleUnauthorized(response);
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error || `HTTP ${response.status} Error`);
   }
@@ -47,6 +70,7 @@ export async function postExpense({ payload, networkMode = 'normal' } = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'Idempotency-Key': payload.idempotencyKey,
+    ...authHeaders(),
     ...buildSimHeaders(networkMode),
   };
 
@@ -57,6 +81,7 @@ export async function postExpense({ payload, networkMode = 'normal' } = {}) {
   });
 
   if (!response.ok) {
+    handleUnauthorized(response);
     const errBody = await response.json().catch(() => ({}));
     const errMsg = errBody.errors
       ? errBody.errors.join(', ')
@@ -77,7 +102,7 @@ export async function postExpense({ payload, networkMode = 'normal' } = {}) {
  * @returns {Promise<void>}
  */
 export async function deleteExpense({ id, networkMode = 'normal' } = {}) {
-  const headers = buildSimHeaders(networkMode);
+  const headers = { ...authHeaders(), ...buildSimHeaders(networkMode) };
 
   const response = await fetch(`${BASE_URL}/expenses/${encodeURIComponent(id)}`, {
     method: 'DELETE',
@@ -85,8 +110,36 @@ export async function deleteExpense({ id, networkMode = 'normal' } = {}) {
   });
 
   if (!response.ok) {
+    handleUnauthorized(response);
     const errBody = await response.json().catch(() => ({}));
     throw new Error(errBody.error || `HTTP ${response.status}`);
   }
   // 204 No Content — nothing to return
+}
+
+/**
+ * Parse natural language text into a structured expense using AI.
+ * @param {{ text: string, networkMode?: string }} options
+ * @returns {Promise<{ amount: number, category: string, description: string, date: string }>}
+ */
+export async function parseExpenseWithAI({ text, networkMode = 'normal' } = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...authHeaders(),
+    ...buildSimHeaders(networkMode),
+  };
+
+  const response = await fetch(`${BASE_URL}/expenses/parse`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    handleUnauthorized(response);
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
 }

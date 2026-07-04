@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CATEGORIES } from '../constants';
-import { postExpense } from '../api/expenseApi';
+import { postExpense, parseExpenseWithAI } from '../api/expenseApi';
 
 /**
  * ExpenseForm — controlled form for recording a new expense.
@@ -11,6 +11,10 @@ function ExpenseForm({ networkMode, addLog, onExpenseAdded }) {
   const [category, setCategory] = useState('Food');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const [aiMode, setAiMode] = useState(false);
+  const [aiText, setAiText] = useState('');
+  const [parsing, setParsing] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -92,6 +96,32 @@ function ExpenseForm({ networkMode, addLog, onExpenseAdded }) {
     setSubmitting(false);
   };
 
+  const handleAiParse = async () => {
+    if (!aiText.trim()) return;
+    
+    setParsing(true);
+    setSubmitError(null);
+    addLog('outbound', `Parsing with AI: "${aiText}"`);
+    
+    try {
+      const data = await parseExpenseWithAI({ text: aiText, networkMode });
+      
+      if (data.amount) setAmount(data.amount);
+      if (data.category && CATEGORIES.includes(data.category)) setCategory(data.category);
+      if (data.description) setDescription(data.description);
+      if (data.date) setDate(data.date);
+      
+      addLog('success', `AI parsed successfully`);
+      setAiMode(false); // Switch back to manual form to let user review
+      setAiText('');
+    } catch (err) {
+      setSubmitError(`AI Parsing failed: ${err.message}`);
+      addLog('fail', `AI Parsing failed: ${err.message}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   return (
     <div className="glass-card">
       <h2 className="card-title">Add Expense</h2>
@@ -115,7 +145,51 @@ function ExpenseForm({ networkMode, addLog, onExpenseAdded }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <div className="form-mode-toggle" style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+        <button
+          type="button"
+          className={`btn ${!aiMode ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setAiMode(false)}
+          style={{ flex: 1, padding: '8px', fontSize: '13px' }}
+        >
+          Manual Entry
+        </button>
+        <button
+          type="button"
+          className={`btn ${aiMode ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setAiMode(true)}
+          style={{ flex: 1, padding: '8px', fontSize: '13px' }}
+        >
+          ✨ Smart Entry
+        </button>
+      </div>
+
+      {aiMode ? (
+        <div className="ai-entry-mode" style={{ marginBottom: '20px' }}>
+          <div className="form-group">
+            <label htmlFor="ai-text">Describe your expense</label>
+            <textarea
+              id="ai-text"
+              className="form-control"
+              placeholder='e.g., "I spent ₹450 on Starbucks coffee yesterday"'
+              value={aiText}
+              onChange={(e) => setAiText(e.target.value)}
+              disabled={parsing}
+              rows="3"
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+          <button 
+            type="button" 
+            className="btn btn-primary btn-full" 
+            onClick={handleAiParse}
+            disabled={parsing || !aiText.trim()}
+          >
+            {parsing ? 'Parsing...' : 'Parse with AI ✨'}
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="amount">Amount *</label>
           <div className="input-wrapper">
@@ -202,6 +276,7 @@ function ExpenseForm({ networkMode, addLog, onExpenseAdded }) {
           )}
         </button>
       </form>
+      )}
     </div>
   );
 }
