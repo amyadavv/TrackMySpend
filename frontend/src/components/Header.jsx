@@ -1,10 +1,23 @@
 import { useAuth } from '../context/AuthContext';
+import { useState, useRef, useEffect } from 'react';
 
 /**
  * Header — top banner with logo, user info, network simulation selector, and theme toggle.
  */
 function Header({ networkMode, setNetworkMode, theme, toggleTheme, addLog }) {
   const { user, logout } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="app-header">
@@ -38,24 +51,34 @@ function Header({ networkMode, setNetworkMode, theme, toggleTheme, addLog }) {
 
         {/* User info & logout */}
         {user && (
-          <div className="user-widget">
-            <span className="user-email" title={user.email}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              {user.email}
-            </span>
+          <div className="user-menu-container" ref={menuRef}>
             <button
-              type="button"
-              className="btn-logout"
-              onClick={logout}
-              title="Sign out"
-              aria-label="Sign out"
+              className="avatar-btn"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-expanded={isMenuOpen}
+              aria-label="User menu"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              {user.email.charAt(0).toUpperCase()}
             </button>
+
+            {isMenuOpen && (
+              <div className="avatar-dropdown">
+                <div className="dropdown-header">
+                  <p className="dropdown-email" title={user.email}>{user.email}</p>
+                </div>
+                <div className="dropdown-divider"></div>
+                <button
+                  type="button"
+                  className="dropdown-item text-danger"
+                  onClick={logout}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         )}
 
