@@ -116,3 +116,30 @@ export async function deleteExpense({ id, networkMode = 'normal' } = {}) {
   }
   // 204 No Content — nothing to return
 }
+
+/**
+ * Parse natural language text into a structured expense using AI.
+ * @param {{ text: string, networkMode?: string }} options
+ * @returns {Promise<{ amount: number, category: string, description: string, date: string }>}
+ */
+export async function parseExpenseWithAI({ text, networkMode = 'normal' } = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...authHeaders(),
+    ...buildSimHeaders(networkMode),
+  };
+
+  const response = await fetch(`${BASE_URL}/expenses/parse`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    handleUnauthorized(response);
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}

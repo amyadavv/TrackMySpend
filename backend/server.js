@@ -4,6 +4,7 @@ import { connectDB } from './db.js';
 import { hashPassword, verifyPassword, generateToken, authenticateToken } from './middleware/auth.js';
 import User from './models/User.js';
 import Expense, { VALID_CATEGORIES } from './models/Expense.js';
+import { GoogleGenAI } from '@google/genai';
 
 // PORT is injected by the platform (Render sets it automatically) or falls back to 5000 locally.
 // No HOST is passed to app.listen so Node defaults to 0.0.0.0 (all interfaces) — required by cloud platforms.
@@ -231,6 +232,54 @@ app.get('/expenses/summary', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching summary:', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * POST /expenses/parse
+ * Parses a natural language sentence into a structured expense using Gemini.
+ */
+app.post('/expenses/parse', authenticateToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text input is required.' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    const prompt = `You are an AI assistant that extracts expense data from natural language.
+Today's date is: ${today}. Calculate relative dates (like "yesterday") based on this.
+
+Extract the following information from the text and return it as a pure JSON object (do not wrap in markdown or backticks):
+- "amount": a number representing the total cost (convert to a positive number). If no amount is found, return null.
+- "category": choose the single best fit from this exact list: [${VALID_CATEGORIES.join(', ')}]. If unsure, choose "Others".
+- "description": a short, concise description of the expense (max 5 words).
+- "date": the date of the expense in YYYY-MM-DD format. If not mentioned, use today's date.
+
+Text to parse: "${text}"`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    const parsedText = response.text;
+    const data = JSON.parse(parsedText);
+    
+    res.json(data);
+  } catch (error) {
+    console.error('Error parsing expense with AI:', error);
+    res.status(500).json({ error: 'Failed to parse expense with AI.' });
   }
 });
 
