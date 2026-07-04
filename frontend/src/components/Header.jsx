@@ -22,7 +22,7 @@ function Header({ networkMode, setNetworkMode, theme, toggleTheme, addLog }) {
   return (
     <header className="app-header">
       <div className="logo-section">
-        <h1>TrackMySpend</h1>
+        <h1>TrackMySpend AI</h1>
         <p>Production-Grade Personal Finance Tracker</p>
       </div>
 
