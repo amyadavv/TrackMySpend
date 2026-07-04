@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
+import { useAuth } from './context/AuthContext';
 import { CATEGORIES } from './constants';
 import { getExpenses, deleteExpense } from './api/expenseApi';
 
+import AuthPage from './components/AuthPage';
 import Header from './components/Header';
 import ExpenseForm from './components/ExpenseForm';
 import NetworkConsole from './components/NetworkConsole';
@@ -12,6 +14,8 @@ import CategoryBreakdown from './components/CategoryBreakdown';
 import ExpenseLedger from './components/ExpenseLedger';
 
 function App() {
+  const { user, loading: authLoading } = useAuth();
+
   // Expense list state
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,10 +96,12 @@ function App() {
     }
   };
 
-  // Fetch whenever filter or network mode changes
+  // Fetch whenever filter or network mode changes (only when authenticated)
   useEffect(() => {
-    fetchExpenses();
-  }, [categoryFilter, networkMode]);
+    if (user) {
+      fetchExpenses();
+    }
+  }, [categoryFilter, networkMode, user]);
 
   // ── Derived data (calculations for current view) ───────────────────────────
 
@@ -111,7 +117,24 @@ function App() {
     if (!categorySummary[c]) categorySummary[c] = 0;
   });
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Auth Loading State ────────────────────────────────────────────────────
+
+  if (authLoading) {
+    return (
+      <div className="auth-loading">
+        <div className="auth-loading-spinner" />
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // ── Not Authenticated → Show Auth Page ────────────────────────────────────
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  // ── Authenticated → Show Dashboard ────────────────────────────────────────
 
   return (
     <>
